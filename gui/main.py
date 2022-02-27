@@ -5,67 +5,10 @@ from tkinter import ttk
 from tkinter.ttk import *
 
 from cars import CarStore, Car
+from gui.cars import StoreDuplicateItem
 from roads import Backroad, Highway, Route
 
 PRICE = 1.48
-
-
-class Grid(Frame):
-    def __init__(self, parent) -> None:
-        Frame.__init__(self, parent)
-
-        self.current_row = 0
-        self.config()
-
-    def config(self, columns=1, expand_last_item=True):
-        self.columns = columns
-        self.expand_last_item = expand_last_item
-
-        return self
-
-    def clear(self):
-        self.current_row = 0
-
-        for widget in self.winfo_children():
-            widget.destroy()
-
-        return self
-
-    def append(self, *widgets):
-        if len(widgets) > self.columns:
-            raise ValueError("Too many items in grid")
-
-        for index, widget in enumerate(widgets):
-            span = 1
-
-            if index == len(
-                    widgets
-            ) - 1 and self.expand_last_item and self.columns > len(widgets):
-                span = self.columns - len(widgets)
-
-            widget.grid(row=self.current_row,
-                        column=index,
-                        columnspan=span,
-                        sticky="nswe",
-                        pady=(0, 4))
-
-        self.current_row += 1
-
-        return self
-
-
-class TextFrame(Frame):
-    """
-  This is a sort of replacement for `ttk.Text` that doesn't insist on ignoring
-  the size of its contents
-  """
-    def clear(self):
-        for widget in self.winfo_children():
-            widget.destroy()
-
-    def write(self, text=""):
-        label = Label(self, text=text)
-        label.pack()
 
 
 class Table(Frame):
@@ -73,22 +16,39 @@ class Table(Frame):
     A simple table viewer implemented using a significant amount of jank
     """
 
+    # Stores all of the rows that will be rendered
     __rows: list[list[str]] = []
 
     def add_row(self, row: list[str]) -> None:
+        # Append and rerender
         self.__rows.append(row)
         self.render()
 
     def clear(self):
+        """
+        Clears all of the contents of the grid
+        """
+
+        self.__rows = []
+        self.render_clear()
+
+    def render_clear(self):
+        """
+        Hides the contents of the grid. THE CONTENTS IS STILL STORED
+        """
+
         for widget in self.winfo_children():
+            widget.grid_remove()
             widget.destroy()
 
     def render(self):
         # Start with a blank slate
-        self.clear()
+        self.render_clear()
 
         # Loop through all of the columns
         for y, row in enumerate(self.__rows):
+            # The default fonts for grid items
+            # TODO: This should conform to system theme
             font = ('Arial', 12)
 
             # If this is the header, give it a bold font
@@ -99,7 +59,7 @@ class Table(Frame):
             for x, column in enumerate(row):
                 # We need to use tk labels, rather than ttk labels to set the
                 # background color
-                label = tk.Label(self, text=column, font=font)
+                label = tk.Label(self, text=column.capitalize(), font=font)
 
                 # Give the table headers a background color.
                 # FIXME: This just ignores the system dark theme
@@ -107,9 +67,13 @@ class Table(Frame):
                     label['background'] = '#d3d3d3'
                     label['foreground'] = '#000000'
 
+                # Add the label to the grid
                 label.grid(row=y, column=x, sticky="nswe")
 
     def write(self, text=""):
+        # Write a label to the end of the grid with no particular regard for
+        # formatting.
+
         length = len(self.winfo_children())
         label = Label(self, text=text)
         label.grid(row=length, column=0, sticky="nswe")
@@ -252,22 +216,21 @@ class App(Tk):
             ])
 
         # Get a list of all the car names
-        # FIXME: There w
-        car_names = []
-
-        for car in self.car_store.get():
-            car_names.append(car.name)
+        car_names = [car.name.capitalize() for car in self.car_store.get()]
 
         # Select the car
         car = StringVar()
         car.set("Select a car")
 
-        car_selector = Combobox(self.sidebar_stack, textvariable=car)
-        car_selector['values'] = tuple(car_names)
+        # Create the dropdown and pack it into the frame
+        car_selector = OptionMenu(self.sidebar_stack, car, "Select a car",
+                                  *car_names)
         car_selector.pack()
 
-        road, road_selector = self.get_road()
+        # Add a road selector
+        road, _road_selector = self.get_road()
 
+        # Create the calculate button which calls the calculate method defined above
         button = Button(self.sidebar_stack,
                         text="Calculate",
                         command=lambda: calculate(car.get(), road.get()))
@@ -275,22 +238,32 @@ class App(Tk):
 
     def update_all_cars(self) -> None:
         def calculate(road: str) -> None:
+            """
+            Calculate the price for all cars using the road of the user's choice
+            """
+
+            # Clear all the old results
             self.results.clear()
+
+            # Get the route object
             route = self.get_route(road)
 
             # Add the header row
             self.results.add_row(["Name", "Price", "Over $400"])
 
-            for car in self.car_store.get():
-                # Generate the price based on the route
-                price = route.get_cost(car.kpl, PRICE)
-                # Add the calculated value to the table
-                self.results.add_row([
-                    car.name, f"${price:.2f}", "Yes" if price > 400 else "No"
-                ])
+            # Calculate the prices for all of the cars
+            price = [(route.get_cost(car.kpl, PRICE), car.name)
+                     for car in self.car_store.get()]
 
+            for price, name in price:
+                # Add the calculated value to the table
+                self.results.add_row(
+                    [name, f"${price:.2f}", "Yes" if price > 400 else "No"])
+
+        # Summon a road selector
         road, _road_selector = self.get_road()
 
+        # Summon a calculate button to trigger the above function
         button = Button(self.sidebar_stack,
                         text="Calculate",
                         command=lambda: calculate(road.get()))
@@ -307,29 +280,46 @@ class App(Tk):
                 self.results.write("Invalid number")
                 return
 
-            # Give the car store a new car to have.
-            self.car_store.add(Car(name, number))
+            # The store may throw an error if there is already a car with that
+            # name located somewhere within the store. We want to catch that error
+            # and prevent the rest of that code from executing.
+            try:
+                # Give the car store a new car to have.
+                self.car_store.add(Car(name, number))
+            except StoreDuplicateItem:
+                self.results.write("Two cars cannot have the same name")
+                return
 
             # Dump the user back on the home screen for visual feedback. A bit
             # horrible, but it works
             self.state.set(AppStateEnum.SELECT)
             self.update()
 
+        # Create the string variables for the entry box
         name = StringVar()
         kpl = StringVar()
 
+        # Create the entry boxes
         name_entry = Entry(self.sidebar_stack, textvariable=name)
         kpl_entry = Entry(self.sidebar_stack, textvariable=kpl)
 
+        # Pack the entry boxes into the layout
         name_entry.pack()
         kpl_entry.pack()
 
+        # Summon confirm button that calls the save function with the required
+        # parameters
         confirm = Button(self.sidebar_stack,
                          text="Add car",
                          command=lambda: save(name.get(), kpl.get()))
         confirm.pack()
 
     def get_route(self, road: str) -> Route:
+        """
+        Converts the road to a route object, which falls back to a backroad if 
+        it cant find anything. Uses constants defined way up above in this class
+        """
+
         if road == self.HIGHWAY:
             route = Highway()
         else:
@@ -337,19 +327,9 @@ class App(Tk):
 
         return route
 
-    def check_car(self, name: str, road: str) -> None:
-        route: Route = self.get_route(road)
-
-        price = route.get_cost(self.car_store.get_car(name).kpl, PRICE)
-
-        self.results.write(f"{route.get_name()}: ${price:.2f}")
-
-        if price > 400:
-            self.results.write(
-                f"WARNING The price for driving via {route.get_name().lower()} is too high!"
-            )
-
     # Terminate the python process
+    # This exists because I am to lazy to replace all occupances and the
+    # performance impact is non-existant
     def destroy(self) -> None:
         self.quit()
 
