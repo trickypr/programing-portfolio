@@ -295,6 +295,10 @@ class App(Tk):
             self.state.set(AppStateEnum.SELECT)
             self.update()
 
+        # Create labels for the entry boxes
+        name_label = Label(self.sidebar_stack, text="Name:")
+        kpl_label = Label(self.sidebar_stack, text="KPL:")
+
         # Create the string variables for the entry box
         name = StringVar()
         kpl = StringVar()
@@ -304,7 +308,9 @@ class App(Tk):
         kpl_entry = Entry(self.sidebar_stack, textvariable=kpl)
 
         # Pack the entry boxes into the layout
+        name_label.pack()
         name_entry.pack()
+        kpl_label.pack()
         kpl_entry.pack()
 
         # Summon confirm button that calls the save function with the required
