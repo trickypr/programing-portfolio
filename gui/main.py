@@ -4,8 +4,7 @@ from tkinter import *
 from tkinter import ttk
 from tkinter.ttk import *
 
-from cars import CarStore, Car
-from gui.cars import StoreDuplicateItem
+from cars import CarStore, Car, StoreDuplicateItem
 from roads import Backroad, Highway, Route
 
 PRICE = 1.48
