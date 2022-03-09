@@ -8,6 +8,9 @@ from cars import CarStore, Car, StoreDuplicateItem
 from roads import Backroad, Highway, Route
 
 PRICE = 1.48
+"""
+Global price of fuel
+"""
 
 
 class Table(Frame):
@@ -79,6 +82,10 @@ class Table(Frame):
 
 
 class AppStateEnum():
+    """
+    Enum containing all of the possible states that the app could be set to
+    """
+
     SELECT = "Select an option"
     INDIVIDUAL_CAR = "Individual car"
     ALL_CARS = "All cars"
@@ -88,8 +95,6 @@ class AppStateEnum():
 
 
 class App(Tk):
-    sidebar_bg = "#7D7D7D"
-
     def __init__(self):
         Tk.__init__(self)
 
@@ -347,8 +352,11 @@ class App(Tk):
 
 # Only run this in the main file, otherwise print a warning
 if __name__ == "__main__":
+    # Summon
     app = App()
+    # Change window title
     app.title("Car comparison")
+    # Tkinter magic
     app.mainloop()
 else:
     print("Run 'main.py' as the main file")
